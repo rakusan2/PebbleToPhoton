@@ -1,0 +1,50 @@
+{
+    "appKeys": {},
+    "capabilities": [
+        ""
+    ],
+    "companyName": "rakusan2@gmail.com",
+    "longName": "PhotonLEDControl",
+    "projectType": "native",
+    "resources": {
+        "media": [
+            {
+                "file": "images/SendBW.png",
+                "name": "Send_Button",
+                "type": "png"
+            },
+            {
+                "file": "images/RLEDBW.png",
+                "name": "Right_LED",
+                "type": "png"
+            },
+            {
+                "file": "images/LLEDBW.png",
+                "name": "Left_LED",
+                "type": "png"
+            },
+            {
+                "file": "fonts/Content-Regular.ttf",
+                "name": "content_regular_16",
+                "type": "font"
+            },
+            {
+                "file": "fonts/Content-Regular.ttf",
+                "name": "content_regular_24",
+                "type": "font"
+            },
+            {
+                "file": "fonts/Content-Regular.ttf",
+                "name": "content_regular_12",
+                "type": "font"
+            }
+        ]
+    },
+    "sdkVersion": "3",
+    "shortName": "PhotonLEDControl",
+    "uuid": "51130677-c6aa-4b43-b278-267606c9685b",
+    "versionLabel": "1.0",
+    "watchapp": {
+        "watchface": false
+    }
+}
