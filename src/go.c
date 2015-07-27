@@ -1,8 +1,8 @@
 #include <pebble.h>
 #include "go.h"
 
-bool stoppedL=false, stoppedR=false,Btransmitting=false;
-static uint8_t x=0, y=0;
+bool stoppedL=false, stoppedR=false,Btransmitting=false, accel_subscribed=false;;
+static int16_t x=0, y=0;
 // BEGIN AUTO-GENERATED UI CODE; DO NOT MODIFY
 static Window *s_window;
 static GFont s_res_content_regular_12;
@@ -42,7 +42,7 @@ static void initialise_ui(void) {
   s_xy_values_layer = text_layer_create(GRect(13, 66, 99, 36));
   text_layer_set_background_color(s_xy_values_layer, GColorClear);
   text_layer_set_text_color(s_xy_values_layer, GColorWhite);
-  text_layer_set_text(s_xy_values_layer, "000{}000");
+  text_layer_set_text(s_xy_values_layer, "000 000");
   text_layer_set_text_alignment(s_xy_values_layer, GTextAlignmentCenter);
   text_layer_set_font(s_xy_values_layer, s_res_content_regular_24);
   layer_add_child(window_get_root_layer(s_window), (Layer *)s_xy_values_layer);
@@ -105,26 +105,10 @@ static void outbox_sent_callback(DictionaryIterator *iterator,void *context){
 static void transmit_to_phone(){
   DictionaryIterator *iterator;
   app_message_outbox_begin(&iterator);
-  dict_write_uint8(iterator, 0, x);
-  dict_write_uint8(iterator, 1, y);
+  dict_write_int16(iterator, 0, x);
+  dict_write_int16(iterator, 1, y);
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "X=%d Y=%d", x,y);
   app_message_outbox_send();
-}
-static void up_click_handler(ClickRecognizerRef recognizer, void *context) {
-  layer_set_hidden(bitmap_layer_get_layer(s_left_stop),stoppedL);
-  stoppedL=!stoppedL;
-}
-
-static void select_click_handler(ClickRecognizerRef recognizer, void *context) {
-  transmit_to_phone();
-}
-
-static void down_click_handler(ClickRecognizerRef recognizer, void *context) {
-  layer_set_hidden(bitmap_layer_get_layer(s_right_stop),stoppedR);
-  stoppedR=!stoppedR;
-}static void long_down_click_handler(ClickRecognizerRef recognizer, void *context) {
-  layer_set_hidden(bitmap_layer_get_layer(s_transmitting),Btransmitting);
-  Btransmitting=!Btransmitting;
-  transmit_to_phone();
 }
 static void Accel_Data_Handler(AccelData *data, uint32_t num_samples){
   if(!stoppedL){
@@ -141,21 +125,45 @@ static void Accel_Data_Handler(AccelData *data, uint32_t num_samples){
     else if(temp_y>255)temp_y=255;
     y=temp_y;
   }
-  static char buffer[]="000{}000";
-  snprintf(buffer,sizeof("000{}000"),"%03d|%-3d",x,y);
+  static char buffer[]="000 000";
+  snprintf(buffer,sizeof("000 000"),"%03d %-3d",x,y);
   text_layer_set_text(s_xy_values_layer, buffer);
-    
+    if(Btransmitting)transmit_to_phone();
 }
+static void check_complete_stop(){
+  if(!stoppedR && !stoppedL){
+    accel_data_service_unsubscribe();
+    accel_subscribed=false;
+  }
+  else if(!accel_subscribed){
+    accel_subscribed=true;
+    accel_data_service_subscribe(1, Accel_Data_Handler);
+  }
+}
+static void up_click_handler(ClickRecognizerRef recognizer, void *context) {
+  layer_set_hidden(bitmap_layer_get_layer(s_left_stop),stoppedL);
+  stoppedL=!stoppedL;
+  check_complete_stop();
+}
+
+static void select_click_handler(ClickRecognizerRef recognizer, void *context) {
+  transmit_to_phone();
+}
+
+static void down_click_handler(ClickRecognizerRef recognizer, void *context) {
+  layer_set_hidden(bitmap_layer_get_layer(s_right_stop),stoppedR);
+  stoppedR=!stoppedR;
+  check_complete_stop();
+}static void long_down_click_handler(ClickRecognizerRef recognizer, void *context) {
+  layer_set_hidden(bitmap_layer_get_layer(s_transmitting),Btransmitting);
+  Btransmitting=!Btransmitting;
+  transmit_to_phone();
+}
+
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed){
-  time_t temp = time(NULL);
-  struct tm *tick_time2 = localtime(&temp);
-  static char buffer[] = "00:00";
-  if(clock_is_24h_style() == true){
-    strftime(buffer, sizeof("00:00"), "%H:%M", tick_time2);
-  }
-  else{
-    strftime(buffer, sizeof("00:00"), "%I:%M", tick_time2);
-  }
+  static char buffer[16];
+  clock_copy_time_string(buffer, sizeof(buffer));
+ 
   text_layer_set_text(s_time_layer,buffer);
 }
 static void handle_window_unload(Window* window) {
@@ -173,6 +181,7 @@ void show_go(void) {
   tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
   accel_service_set_sampling_rate(ACCEL_SAMPLING_10HZ);
   accel_data_service_subscribe(1, Accel_Data_Handler);
+  accel_subscribed=true;
   app_message_register_inbox_received(inbox_recieved_callback);
   app_message_register_inbox_dropped(inbox_dropped_callback);
   app_message_register_outbox_failed(outbox_failed_callback);

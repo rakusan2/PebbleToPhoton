@@ -7,6 +7,6 @@ Pebble.addEventListener('ready',function(e){
 });
 Pebble.addEventListener('appmessage',function(e){
   if(e.payload.Left_Value)x=e.payload.Left_Value;
-  else if(e.payload.Right_Value)y=e.payload.Right_Value;
-  console.log('AppMessage recieved! X='+x+' Y='+y);
+  if(e.payload.Right_Value)y=e.payload.Right_Value;
+  console.log('AppMessage recieved! X='+x+' Y='+y+ ' payload0='+e.payload.Left_Value+' payload1='+e.payload.Right_Value);
 });
