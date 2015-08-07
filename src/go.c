@@ -131,7 +131,7 @@ static void Accel_Data_Handler(AccelData *data, uint32_t num_samples){
     if(Btransmitting)transmit_to_phone();
 }
 static void check_complete_stop(){
-  if(!stoppedR && !stoppedL){
+  if(stoppedR && stoppedL){
     accel_data_service_unsubscribe();
     accel_subscribed=false;
   }
