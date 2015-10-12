@@ -2,7 +2,7 @@
 #include "go.h"
 
 bool stoppedL=false, stoppedR=false,Btransmitting=false, accel_subscribed=false;;
-static int16_t x=0, y=0;
+static int16_t x=0, y=0, delay=0, currentAc=0;
 // BEGIN AUTO-GENERATED UI CODE; DO NOT MODIFY
 static Window *s_window;
 static GFont s_res_content_regular_12;
@@ -10,12 +10,14 @@ static GFont s_res_content_regular_24;
 static GBitmap *s_res_left_led;
 static GBitmap *s_res_send_button;
 static GBitmap *s_res_right_led;
+static GFont s_res_content_regular_16;
 static TextLayer *s_time_layer;
 static TextLayer *s_xy_values_layer;
 static ActionBarLayer *s_actionbarlayer_1;
 static BitmapLayer *s_left_stop;
 static BitmapLayer *s_right_stop;
 static BitmapLayer *s_transmitting;
+static TextLayer *s_delay_text;
 
 static void initialise_ui(void) {
   s_window = window_create();
@@ -29,6 +31,7 @@ static void initialise_ui(void) {
   s_res_left_led = gbitmap_create_with_resource(RESOURCE_ID_Left_LED);
   s_res_send_button = gbitmap_create_with_resource(RESOURCE_ID_Send_Button);
   s_res_right_led = gbitmap_create_with_resource(RESOURCE_ID_Right_LED);
+  s_res_content_regular_16 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_content_regular_16));
   // s_time_layer
   s_time_layer = text_layer_create(GRect(0, 0, 144, 18));
   text_layer_set_background_color(s_time_layer, GColorClear);
@@ -70,6 +73,14 @@ static void initialise_ui(void) {
   s_transmitting = bitmap_layer_create(GRect(55, 105, 15, 15));
   bitmap_layer_set_bitmap(s_transmitting, s_res_send_button);
   layer_add_child(window_get_root_layer(s_window), (Layer *)s_transmitting);
+  
+  // s_delay_text
+  s_delay_text = text_layer_create(GRect(73, 98, 30, 30));
+  text_layer_set_background_color(s_delay_text, GColorClear);
+  text_layer_set_text_color(s_delay_text, GColorWhite);
+  text_layer_set_text(s_delay_text, "0");
+  text_layer_set_font(s_delay_text, s_res_content_regular_16);
+  layer_add_child(window_get_root_layer(s_window), (Layer *)s_delay_text);
 }
 
 static void destroy_ui(void) {
@@ -80,11 +91,13 @@ static void destroy_ui(void) {
   bitmap_layer_destroy(s_left_stop);
   bitmap_layer_destroy(s_right_stop);
   bitmap_layer_destroy(s_transmitting);
+  text_layer_destroy(s_delay_text);
   fonts_unload_custom_font(s_res_content_regular_12);
   fonts_unload_custom_font(s_res_content_regular_24);
   gbitmap_destroy(s_res_left_led);
   gbitmap_destroy(s_res_send_button);
   gbitmap_destroy(s_res_right_led);
+  fonts_unload_custom_font(s_res_content_regular_16);
 }
 // END AUTO-GENERATED UI CODE
 
@@ -99,7 +112,7 @@ static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResul
   APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox sent failed");
 }
 static void outbox_sent_callback(DictionaryIterator *iterator,void *context){
-  APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success");
+  //APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success");
 }
 
 static void transmit_to_phone(){
@@ -107,8 +120,9 @@ static void transmit_to_phone(){
   app_message_outbox_begin(&iterator);
   dict_write_int16(iterator, 0, x);
   dict_write_int16(iterator, 1, y);
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "X=%d Y=%d", x,y);
-  app_message_outbox_send();
+  dict_write_int8(iterator, 2, 0); //TCP_Ready
+  if(app_message_outbox_send()==APP_MSG_BUSY)delay++;
+  else if(delay>0) delay--;
 }
 static void Accel_Data_Handler(AccelData *data, uint32_t num_samples){
   if(!stoppedL){
@@ -125,10 +139,16 @@ static void Accel_Data_Handler(AccelData *data, uint32_t num_samples){
     else if(temp_y>255)temp_y=255;
     y=temp_y;
   }
-  static char buffer[]="000 000";
-  snprintf(buffer,sizeof("000 000"),"%03d %-3d",x,y);
+  static char buffer[]="000 000", bufferd[]="000";
+  snprintf(buffer, sizeof("000 000"), "%03d %-3d",x,y);
+  snprintf(bufferd, sizeof("000"), "%03d",delay);
+  text_layer_set_text(s_delay_text, bufferd);
   text_layer_set_text(s_xy_values_layer, buffer);
-    if(Btransmitting)transmit_to_phone();
+  if(Btransmitting && currentAc>=delay){
+    transmit_to_phone();
+    currentAc=0;
+  }
+  currentAc++;
 }
 static void check_complete_stop(){
   if(stoppedR && stoppedL){
@@ -156,6 +176,7 @@ static void down_click_handler(ClickRecognizerRef recognizer, void *context) {
   check_complete_stop();
 }static void long_down_click_handler(ClickRecognizerRef recognizer, void *context) {
   layer_set_hidden(bitmap_layer_get_layer(s_transmitting),Btransmitting);
+  text_layer_set_text(s_delay_text, (Btransmitting? "0":""));
   Btransmitting=!Btransmitting;
   transmit_to_phone();
 }

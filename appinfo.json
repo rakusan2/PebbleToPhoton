@@ -1,6 +1,7 @@
 {
     "appKeys": {
         "Left_Value": 0,
+        "Photon_Ready": 2,
         "Right_Value": 1
     },
     "capabilities": [
